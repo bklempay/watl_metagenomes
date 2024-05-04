@@ -38,7 +38,7 @@ while getopts 'n:b:m:' opt; do
 		# REQUIRED sample names must be separated by spaces, and batches by linebreaks
 		n) worklist_names=$OPTARG ;;
 		# REQUIRED reference sample name followed by list of samples for read mapping
-		b) worklist_bwa=$OPTARG ;;
+		b) bwa_maplist=$OPTARG ;;
 		# OPTIONAL estimated RAM requirement for each metaspades assembly (Gb)
 		m) worklist_mem=$OPTARG ;;
 	esac
@@ -131,7 +131,7 @@ while read line; do
 			-i all_output/fastp_output -r assemblies -o all_output/bwa_output \
 			-n $refname -m $name -t $cpus
 	done
-done < $worklist_bwa
+done < $bwa_maplist
 
 echo -e '\nDone!'
 echo 'See all_output/bwa_output/*_alignments/*bwa.log for details'
@@ -216,7 +216,10 @@ echo -e '\nbwa mem parameters:'
 echo '-t				'$cpus
 
 # merge dereplicated bins into a single reference fasta
-scripts/merge_bins.sh -i all_output/drep_output/dereplicated_genomes -o all_output/relabund_calc
+scripts/merge_bins.sh \
+	-i all_output/drep_output/dereplicated_genomes \
+	-o all_output/relabund_calc/merged_bins.fasta \
+	-s .fa -t fasta
 
 # run alignments in sequence using all available threads
 for name in $names; do
@@ -279,6 +282,11 @@ done
 echo -e '\nDone!'
 echo 'See all_output/emapper_output/*emapper.log for details'
 
+# merge emapper annotations into a single tsv
+scripts/merge_bins.sh \
+	-i all_output/emapper_output -o annotations_merged.tsv \
+	-s .emapper.annotations -t tsv
+
 
 #### Summarize bins and calculate relative abundance ####
 
@@ -301,3 +309,7 @@ mkdir -p all_output/protein_stats
 parallel -j $cpus scripts/protein_stats.py {1} \
 	::: all_output/prodigal_output/*.faa
 mv all_output/prodigal_output/*.csv all_output/protein_stats
+# merge protein stats into a single csv
+scripts/merge_bins.sh \
+	-i all_output/protein_stats -o bins_protein_stats.csv \
+	-s proteins_stats.csv -t csv
